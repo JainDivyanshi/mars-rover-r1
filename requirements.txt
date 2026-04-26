@@ -1,0 +1,12 @@
+pybullet
+numpy
+matplotlib
+torch
+stable-baselines3[extra]
+gymnasium
+open3d
+pyvista
+rasterio
+scipy
+tensorboard
+imageio
