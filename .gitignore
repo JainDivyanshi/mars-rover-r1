@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+models/*.zip
+data/terrain/*.tif
+tensorboard_logs/
