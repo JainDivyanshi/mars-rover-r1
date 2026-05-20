@@ -24,8 +24,8 @@ from rover_urdf_generator import get_rover_urdf_path
 
 
 # ── Physical constants ────────────────────────────────────────────────────────
-MAX_FORCE    = 30.0   # ✅ CHANGED: was 10.0 → increased torque (better traction)
-MAX_VELOCITY = 6.0    # ✅ CHANGED: was 15.0 → reduced speed (more stable learning)
+MAX_FORCE    = 10.0   # N·m — maximum torque per wheel
+MAX_VELOCITY = 15.0   # rad/s — maximum wheel angular velocity
 WHEELBASE    = 0.50   # m — lateral distance between left and right wheels
 
 
@@ -191,11 +191,13 @@ if __name__ == "__main__":
     client = p.connect(p.GUI)
     p.setAdditionalSearchPath(
         pybullet_data.getDataPath(), physicsClientId=client)
-    p.setGravity(0, 0, -3.72, physicsClientId=client)
+    p.setGravity(0, 0, -3.72, physicsClientId=client)   # Mars gravity
     p.setRealTimeSimulation(0, physicsClientId=client)
 
+    # Load a flat ground plane
     p.loadURDF("plane.urdf", physicsClientId=client)
 
+    # Load the rover
     rover_id = p.loadURDF(
         urdf_path,
         basePosition=[0, 0, 0.3],
@@ -218,6 +220,7 @@ if __name__ == "__main__":
     print("\nControls in terminal (press Ctrl+C to stop):")
     print("  The rover will drive forward for 3s, then turn for 2s, then stop.")
 
+    # ── Demo drive sequence ──────────────────────────────────────────────────
     sequences = [
         ("Driving forward...",  1.0,  1.0,  3.0),
         ("Turning right...",    1.0, -1.0,  2.0),
@@ -229,11 +232,13 @@ if __name__ == "__main__":
 
     for label, left, right, duration in sequences:
         print(f"  {label}")
+        t = 0.0
         dt = 1.0 / 240.0
         steps = int(duration / dt)
         for _ in range(steps):
             rover.drive(left, right)
             p.stepSimulation(physicsClientId=client)
+            pos, yaw = rover.get_pose()
             time.sleep(dt)
 
     pos, yaw = rover.get_pose()
