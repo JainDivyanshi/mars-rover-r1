@@ -24,8 +24,8 @@ from rover_urdf_generator import get_rover_urdf_path
 
 
 # ── Physical constants ────────────────────────────────────────────────────────
-MAX_FORCE    = 10.0   # N·m — maximum torque per wheel
-MAX_VELOCITY = 15.0   # rad/s — maximum wheel angular velocity
+MAX_FORCE    = 30.0   # N·m — maximum torque per wheel
+MAX_VELOCITY = 6.0   # rad/s — maximum wheel angular velocity
 WHEELBASE    = 0.50   # m — lateral distance between left and right wheels
 
 

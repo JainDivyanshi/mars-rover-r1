@@ -46,13 +46,14 @@ class MarsEnv(gym.Env):
         self.render_mode  = render
         self.terrain_size = 128
 
-        # ── Observation space (261 values total) ──────────────────────────────
-        # [0:256]   16×16 local SLAM occupancy grid patch (flattened)
-        # [256:258] unit vector pointing from rover to goal  (direction)
-        # [258]     normalised distance to goal              (0=at goal, 1=far)
-        # [259:261] rover velocity (vx, vy) normalised to [-1, 1]
+        # ── Observation space (517 values total) ──────────────────────────────
+        # [0:256]    occupancy grid patch
+        # [256:512]  terrain elevation patch
+        # [512:514]  goal direction
+        # [514]      normalised distance
+        # [515:517]  rover velocity
         self.observation_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(261,), dtype=np.float32)
+            low=-1.0, high=1.0, shape=(517,), dtype=np.float32)
 
         # Actions: [left_wheel_speed, right_wheel_speed] both in [-1, 1]
         self.action_space = spaces.Box(
@@ -67,7 +68,7 @@ class MarsEnv(gym.Env):
         self.map   = OccupancyGrid()
 
         self.step_count   = 0
-        self.max_steps    = 500   # FIX: was 1000 — shorter episodes = more
+        self.max_steps    = 350   # FIX: was 1000 — shorter episodes = more
                                   # resets = rover sees more diverse start
                                   # positions = better generalisation.
                                   # Also: ep_len stuck at 1000 was a red flag.
@@ -315,15 +316,50 @@ class MarsEnv(gym.Env):
         pos, _ = p.getBasePositionAndOrientation(
             self.rover_id, physicsClientId=self.physics)
 
-        patch     = self.map.get_local_patch(pos).flatten()          # 256
+                # ── Occupancy patch ─────────────────────────────────────────────
+        occ_patch = self.map.get_local_patch(pos)
+
+        # ── Terrain elevation patch ────────────────────────────────────
+        xi, yi = int(pos[0]), int(pos[1])
+
+        terrain_patch = self.terrain_data[
+            max(0, xi - 8):xi + 8,
+            max(0, yi - 8):yi + 8
+        ]
+
+        terrain_patch = np.pad(
+            terrain_patch,
+            (
+                (0, 16 - terrain_patch.shape[0]),
+                (0, 16 - terrain_patch.shape[1])
+            ),
+            mode='edge'
+        )
+
+        # normalize terrain heights
+        terrain_patch = terrain_patch / 5.0
+
+        # flatten both
+        occ_patch = occ_patch.flatten()
+        terrain_patch = terrain_patch.flatten()
+
+        # ── Goal features ──────────────────────────────────────────────
         to_goal   = self.goal_pos[:2] - np.array(pos[:2])
         dist      = float(np.linalg.norm(to_goal)) + 1e-8
-        direction = to_goal / dist                                    # 2
-        norm_dist = np.array([min(dist / 60.0, 1.0)])                # 1
-        norm_vel  = np.clip(self.current_vel / 5.0, -1, 1)          # 2
+        direction = to_goal / dist
+        norm_dist = np.array([min(dist / 60.0, 1.0)])
 
-        return np.concatenate(
-            [patch, direction, norm_dist, norm_vel]).astype(np.float32)
+        # ── Velocity ───────────────────────────────────────────────────
+        norm_vel  = np.clip(self.current_vel / 5.0, -1, 1)
+
+        # ── Final observation ──────────────────────────────────────────
+        return np.concatenate([
+            occ_patch,
+            terrain_patch,
+            direction,
+            norm_dist,
+            norm_vel
+        ]).astype(np.float32)
 
     def _compute_reward(self, new_pos):
         """
